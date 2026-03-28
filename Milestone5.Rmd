@@ -1,0 +1,140 @@
+---
+title: "Milestone 6"
+author: "Myranda Ross"
+date: "2025-04-17"
+output: html_document
+---
+
+## Exploratory Analysis 
+
+### Import Data
+```{r data}
+wordle=WordleSpeed <- WordleSpeed <- read.csv("~/Desktop/QMB Labs/WordleSpeed.csv", stringsAsFactors=TRUE)
+
+#fixing the order of the time
+wordle$Day_time = factor(wordle$Day_time, levels=c("Early morning","Late morning", "Afternoon","Evening","Night"))
+
+# Difficulty bins for clearer analysis of the mean
+wordle$difficulty_bin <- cut(wordle$Difficulty, breaks = c(3.0,3.5,4.0,4.5,5.0,5.5,6.0))
+
+```
+Dataset looks at how quickly I was able to complete the Wordle over the course of 24 days based on diffuclty level (Difficulty:continuous variable between 1-6) and time of day (Day_time:Early morning, Late morning, Afternoon, Evening, Night). 
+
+### Summary Statistics
+```{r summary}
+summary(wordle)
+str(wordle)
+
+#Mean completion time for different categories
+with(wordle, tapply(Completion,Day_time,mean))
+with(wordle, tapply(Completion,Difficulty,mean))
+with(wordle, tapply(Completion, difficulty_bin, mean, na.rm = TRUE))
+```
+I had to make sure my strings were reading as factors for the Day_time variable, and I then changed the order of the levels so they were no longer alphabetical, but instead chronological. Both errors were fixed in the "Import Data" chunk.  The data is now good to work with. 
+
+During my mean analysis, I went back to the "Import Data" chunk and decided to group my diffculty levels into bins so that there was more than one observation in each group. Based on the bins, the difficulty rankings between 4 to 4.5 had the quickest completion times. From the Day_time variables, "Evening" had the fastest mean completion time. 
+
+
+### Look for Outliers and Problems
+```{r outliers}
+hist(wordle$Completion,xaxt = "n",breaks=c(0,40,80,120,160,200,240),col ="#8A9A5B")
+custom_ticks = seq(0, 240, by = 40)
+axis(side = 1, at = custom_ticks)
+
+boxplot(wordle$Completion,col ="#8A9A5B")
+wordle[wordle$Completion>(150),]
+```
+*Outliers:* Based on the histogram and the boxplot of all of the data points, there aren't any outliers in the data. There could be a cause for concern since the data is not normally distributed, but since there are no outliers and the number of obeservations is over 15, the data should work for most analyses.
+
+*Analysis*: The histogram is right skewed, and unimodal at 40-120 seconds, with a range of 0-240 seconds.
+
+
+### Exploratory Plots
+```{r plots}
+plot(Completion~Day_time, data=wordle, las=1, cex.axis=0.8, xlab="Time of Day", ylab="Completion Speed",col ="#8A9A5B")
+
+plot(Completion~Difficulty, data=wordle,col="#8A9A5B", pch=19)
+
+#Custom colors
+custom_colors <- c("#fc6a80", "#FAE033", "skyblue","#CCCCFF","#77529a")
+day_colors <- custom_colors[as.numeric(wordle$Day_time)]
+
+#Both explanatory variables together
+plot(Completion~Difficulty, data=wordle,col=day_colors, pch=19)
+legend("topleft", legend = levels(wordle$Day_time), col = custom_colors, pch = 19)
+```
+
+*Exploratory plots*: The boxplots were made to compare the Completion response variable to the Day_time explanatory variable since the response variable was quatitative and the explanatory variable was categorical. The first scatterplot compares the quantiative response variable (Completion) to the quantitative explanatory varible (Difficulty). The second scatterplot is the same as the first, except it uses color to overlay the third  variable (Day_time) for comparison of both explanatory variables at the same time. 
+
+*Outliers*: After separating the boxplots based on Day_time, one potential outlier was identified for "Night" with a completion time of 182.73 seconds.
+
+*Analysis*: The boxplots show that there are differences amongst the completion times based on the time of day the wordle was completed, with the "Evening" and "Night" times having the quickest completion times. The scatterplot with all three variables shows that the relationship amongst Diffculty and Completion is not liner, but it also shows that the data was randomized where each time of day has a variety of diffculty levels tested. Overall, the scatterplot is not helpful to claim there is a general trend with difficulty levels at this point in time.  
+
+## Statistical Analysis 
+
+### Check Assumptions of ANCOVA
+```{r assumptions}
+word.mod = aov(Completion~Difficulty*Day_time,data=wordle)
+
+hist(resid(word.mod))
+plot(word.mod,which=2)
+plot(word.mod, which=1)
+
+boxplot(Difficulty~Day_time, data=wordle, las=1, cex.axis=0.7)
+
+#Log transformation
+logword.mod = aov(log(Completion)~Difficulty*Day_time,data=wordle)
+
+hist(resid(logword.mod))
+plot(logword.mod,which=2)
+plot(logword.mod, which=1)
+
+boxplot(log(Difficulty)~Day_time, data=wordle, las=1, cex.axis=0.7)
+
+```
+
+*Assumptions*: To begin with, independence in this study was violated in the sense that all observation were taken from a single subject using a repeated measures design. ANCOVA can still be used, however, the general conclusion will be within-subject and not for a general population. Using the original model, the biggest concern was with linearity because the line indicated a substantial dip (about 25 residuals) near the center of the graph. To fix linearity, a log transformation was completed. After transformation, the linearity was nearly perfect. Normality after transformation is met since the histogram and the Q-Q plot are fairly symmetrical. The residuals plot indicates equal variance. All five boxplots comparing explanatory variables have substantial overlap to be considered not correlated and thus pass the uncorrelated assumption as well. 
+
+## Run and Interpret ANCOVA
+```{r ANCOVA}
+summary(logword.mod)
+```
+*Statistical Conclusion*: Fail to reject the hypotheses that state difficulty has no effect on completion time (p=0.527), time of day has no effect on completion time (p=0.527), and difficulty and time of day do not interact to affect completion time (p=0.938). 
+
+*General Conclusion*: Based on the statistical conclusion, it would seem that neither difficulty of the puzzle nor the time of day the wordle is completed impacts the speed in which I can complete it. The results also suggest that the difficulty effects do not depend on the time of day. Since none of these factors are at play, it is likely lurking variables such as levels of tiredness or how many letters are revealed in each guess that contribute to the variation in speed.
+
+##Final Graph
+```{r Graph}
+daytime_col <- c("plum","darkgreen", "goldenrod", "skyblue","slateblue")
+
+par(mar = c(5, 4, 4, 9))
+plot(log(Completion)~Difficulty, data=wordle, 
+     las=1, #rotate axis numbers
+     col=daytime_col[Day_time], #set colors by species
+     pch=c(16,2,4,8,1)[Day_time], #symbols by species
+     ylab="log(Completion)", xlab= "Difficulty") #set axis labels
+
+#Need to run the ANCOVA to get the values for the slope
+logword.mod = aov(log(Completion)~Difficulty*Day_time,data=wordle)
+
+#Plotting best-fit lines for an ANCOVA can be complex
+for(i in 1:5){
+  Day_time<- levels(wordle$Day_time)[i]
+  max <- max(wordle[wordle$Day_time==Day_time,'Difficulty'],na.rm=T)
+  min <- min(wordle[wordle$Day_time==Day_time,'Difficulty'],na.rm=T)
+  pt <- predict(logword.mod,newdata = data.frame(Day_time=rep(Day_time,1),Difficulty=c(min,max)))
+  points(pt~c(min,max),type="l",col=daytime_col[i],lwd=2)
+  print(pt)
+  
+}
+
+legend("topright", #location
+       inset = c(-0.43, 0),
+       levels(wordle$Day_time), #labels
+       bty="n", #no box
+       xpd=TRUE,
+       col=daytime_col, #colors
+       pch=c(16,2,4,8,1), #symbol types
+       lwd=2) #line width
+
+```
